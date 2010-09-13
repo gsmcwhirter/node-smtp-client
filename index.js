@@ -29,6 +29,17 @@ module.exports = {
             cc = bcc = false;
             headers = {};
         }
+        else if (typeof(bcc) == "function")
+        {
+            callback = bcc;
+            bcc = false;
+            headers = {};
+        }
+        else if (typeof(headers) == "function")
+        {
+            callback = headers;
+            headers = {};
+        }
         
         rcpt_list = [];
         
