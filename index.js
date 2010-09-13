@@ -5,138 +5,140 @@
 var smtp = require('./lib/smtp'),
     sys = require('sys');
 
-module.exports = {
-    "_config": {
-        host: "localhost",
-        port: 25,
-        from_addr: "",
-        secure: false,
-        debug: false,
-        user: "",
-        pass: ""
-    },
-    
-    setConfig: function (new_config){
-        this._config = new_config;
-    },
-    
-    send: function (from, to, subject, body, cc, bcc, headers, callback){
-        var client = new smtp.Client();
+module.exports = function (){
+    return {
+        "_config": {
+            host: "localhost",
+            port: 25,
+            from_addr: "",
+            secure: false,
+            debug: false,
+            user: "",
+            pass: ""
+        },
         
-        if (typeof(cc) == "function")
-        {
-            callback = cc;
-            cc = bcc = false;
-            headers = {};
-        }
-        else if (typeof(bcc) == "function")
-        {
-            callback = bcc;
-            bcc = false;
-            headers = {};
-        }
-        else if (typeof(headers) == "function")
-        {
-            callback = headers;
-            headers = {};
-        }
+        setConfig: function (new_config){
+            this._config = new_config;
+        },
         
-        rcpt_list = [];
-        
-        headers = headers || {};
-        headers["Date"] = (new Date()).toString();
-        headers["From"] = from + " <"+this._config.from_addr+">";
-        if (to instanceof Array)
-        {
-            headers["To"] = to.join(", ");
-            to.forEach(function (item){
-                rcpt_list.push(item);
+        send: function (from, to, subject, body, cc, bcc, headers, callback){
+            var client = new smtp.Client();
+            
+            if (typeof(cc) == "function")
+            {
+                callback = cc;
+                cc = bcc = false;
+                headers = {};
+            }
+            else if (typeof(bcc) == "function")
+            {
+                callback = bcc;
+                bcc = false;
+                headers = {};
+            }
+            else if (typeof(headers) == "function")
+            {
+                callback = headers;
+                headers = {};
+            }
+            
+            rcpt_list = [];
+            
+            headers = headers || {};
+            headers["Date"] = (new Date()).toString();
+            headers["From"] = from + " <"+this._config.from_addr+">";
+            if (to instanceof Array)
+            {
+                headers["To"] = to.join(", ");
+                to.forEach(function (item){
+                    rcpt_list.push(item);
+                });
+            }
+            else
+            {
+                headers["To"] = to;
+                rcpt_list.push(to);
+            }
+            if (cc){
+                if (cc instanceof Array)
+                {
+                    headers["Cc"] = cc.join(", ");
+                    cc.forEach(function (item){
+                        rcpt_list.push(item);
+                    });
+                }
+                else
+                {
+                    headers["Cc"] = cc;
+                    rcpt_list.push(cc);
+                }
+                
+            } 
+            if (bcc){
+                if (bcc instanceof Array)
+                {
+                    headers["Bcc"] = bcc.join(", ");
+                    bcc.forEach(function (item){
+                        rcpt_list.push(item);
+                    });
+                }
+                else
+                {
+                    headers["Bcc"] = bcc;
+                    rcpt_list.push(bcc);
+                }
+                
+            } 
+            headers["Subject"] = subject;
+            
+            var message = '';
+            Object.keys(headers).forEach(function (key){
+                message += key+": "+headers[key]+"\r\n";
             });
-        }
-        else
-        {
-            headers["To"] = to;
-            rcpt_list.push(to);
-        }
-        if (cc){
-            if (cc instanceof Array)
-            {
-                headers["Cc"] = cc.join(", ");
-                cc.forEach(function (item){
-                    rcpt_list.push(item);
-                });
-            }
-            else
-            {
-                headers["Cc"] = cc;
-                rcpt_list.push(cc);
-            }
+            message += "\r\n"+body;
             
-        } 
-        if (bcc){
-            if (bcc instanceof Array)
-            {
-                headers["Bcc"] = bcc.join(", ");
-                bcc.forEach(function (item){
-                    rcpt_list.push(item);
-                });
-            }
-            else
-            {
-                headers["Bcc"] = bcc;
-                rcpt_list.push(bcc);
-            }
+            var self = this;
             
-        } 
-        headers["Subject"] = subject;
-        
-        var message = '';
-        Object.keys(headers).forEach(function (key){
-            message += key+": "+headers[key]+"\r\n";
-        });
-        message += "\r\n"+body;
-        
-        var self = this;
-        
-        client.connect(this._config.port, this._config.host, this._config.secure, function(){
-            client.auth(self._config.user, self._config.pass, function(){
-                client.mail(self._config.from_addr, function(){
-                    client.rcptList(rcpt_list, function(){
-                        client.data(message, function(){
-                            client.quit(function(){
-                                client.disconnect();
-                                callback(true);
+            client.connect(this._config.port, this._config.host, this._config.secure, function(){
+                client.auth(self._config.user, self._config.pass, function(){
+                    client.mail(self._config.from_addr, function(){
+                        client.rcptList(rcpt_list, function(){
+                            client.data(message, function(){
+                                client.quit(function(){
+                                    client.disconnect();
+                                    callback(true);
+                                });
                             });
                         });
                     });
                 });
             });
-        });
-        
-        if (this._config.debug)
-        {
-            client.addListener("packetSent", function (data){
-                sys.debug(">>> "+data);
-            });
-        }
-        
-        client.addListener("error", function(err, context){
-            context = context || "packet";
             
-            if (context == "quit")
+            if (this._config.debug)
             {
-                client.disconnect(function (){callback(false);});
-            }
-            else if (context == "disconnect")
-            {
-                callback(false);
-            }
-            else
-            {
-                client.quit(function (){
-                    client.disconnect(function (){callback(false);});
+                client.addListener("packetSent", function (data){
+                    sys.debug(">>> "+data);
                 });
             }
-        });
-    }
+            
+            client.addListener("error", function(err, context){
+                context = context || "packet";
+                
+                if (context == "quit")
+                {
+                    client.disconnect(function (){callback(false);});
+                }
+                else if (context == "disconnect")
+                {
+                    callback(false);
+                }
+                else
+                {
+                    client.quit(function (){
+                        client.disconnect(function (){callback(false);});
+                    });
+                }
+            });
+        }
+    };
 };
