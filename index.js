@@ -13,6 +13,7 @@ module.exports = function (){
             from_addr: "",
             secure: false,
             debug: false,
+            auth_required: false,
             user: "",
             pass: ""
         },
@@ -100,7 +101,7 @@ module.exports = function (){
             var self = this;
             
             client.connect(this._config.port, this._config.host, this._config.secure, function(){
-                client.auth(self._config.user, self._config.pass, function(){
+                var send = function (){
                     client.mail(self._config.from_addr, function(){
                         client.rcptList(rcpt_list, function(){
                             client.data(message, function(){
@@ -111,7 +112,15 @@ module.exports = function (){
                             });
                         });
                     });
-                });
+                };
+                if (self._config.auth_required)
+                {
+                    client.auth(self._config.user, self._config.pass, send);
+                }
+                else
+                {
+                    send();
+                }
             });
             
             if (this._config.debug)
